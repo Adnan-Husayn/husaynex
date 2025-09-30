@@ -1,6 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use clap::{Parser, Subcommand};
+use crate::storage::{load_chain, save_chain};
+
+mod storage;
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -63,6 +66,7 @@ impl Block {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Blockchain {
     pub chain: Vec<Block>,
     pub difficulty: usize,
@@ -114,7 +118,14 @@ impl Blockchain {
 }
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let blockchain = &mut Blockchain::new(2);
+    let path = "./husaynex-chain.txt";
+    let mut blockchain = match load_chain(path) {
+        Ok(chain) => chain,
+        Err(e) => {
+            eprintln!("Error loading blockchain from {}: {}. Creating a new one.", path, e);
+            Blockchain::new(2)
+        }
+    };
 
     match cli.command {
         Commands::Mine { data } => {
@@ -125,6 +136,7 @@ fn main() -> anyhow::Result<()> {
                 Ok(()) => println!("Block mined and added to the blockchain!"),
                 Err(e) => println!("Failed to add block: {}", e),
             }
+            save_chain(path, &blockchain)?;
         }
         Commands::Show => {
             for block in &blockchain.chain {
