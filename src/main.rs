@@ -1,5 +1,20 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(author, version)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    Mine { data: String },
+    Show,
+    Validate,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Block {
@@ -63,15 +78,15 @@ impl Blockchain {
         }
     }
 
-    pub fn add_block(&mut self, mut block : Block) -> Result<(), String> {
+    pub fn add_block(&mut self, block: Block) -> Result<(), String> {
         let last = self.chain.last().unwrap();
         if block.prev_hash != last.hash {
             return Err("prev_hash mismatch".into());
         }
         if block.index != last.index + 1 {
-            return  Err("index mismatch".into());
+            return Err("index mismatch".into());
         }
-        if block.compute_hash() != last.hash {
+        if block.compute_hash() != block.hash {
             return Err("hash invalid".into());
         }
         if !block.hash.starts_with(&"0".repeat(self.difficulty)) {
@@ -84,11 +99,46 @@ impl Blockchain {
     pub fn is_valid(&self) -> bool {
         for (i, block) in self.chain.iter().enumerate().skip(1) {
             let prev = &self.chain[i - 1];
-            if block.prev_hash != prev.hash { return false;}
-            if block.compute_hash() != block.hash { return false; }
-            if !block.hash.starts_with(&"0".repeat(self.difficulty)) {return false;}
+            if block.prev_hash != prev.hash {
+                return false;
+            }
+            if block.compute_hash() != block.hash {
+                return false;
+            }
+            if !block.hash.starts_with(&"0".repeat(self.difficulty)) {
+                return false;
+            }
         }
         true
     }
 }
-fn main() {}
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+    let blockchain = &mut Blockchain::new(2);
+
+    match cli.command {
+        Commands::Mine { data } => {
+            let last = blockchain.chain.last().unwrap();
+            let mut block = Block::new(last.index + 1, data, last.hash.clone());
+            block.mine(2);
+            match blockchain.add_block(block) {
+                Ok(()) => println!("Block mined and added to the blockchain!"),
+                Err(e) => println!("Failed to add block: {}", e),
+            }
+        }
+        Commands::Show => {
+            for block in &blockchain.chain {
+                println!("{:#?}", block);
+            }
+        }
+        Commands::Validate => {
+            if blockchain.is_valid() {
+                println!("Blockchain is valid!")
+            } else if !blockchain.is_valid() {
+                println!("Blockchain is invalid")
+            }
+        }
+    }
+
+    Ok(())
+}
