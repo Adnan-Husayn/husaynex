@@ -35,6 +35,17 @@ impl Block {
 
         blake3::hash(payload.as_bytes()).to_hex().to_string()
     }
+
+    pub fn mine(&mut self, difficulty: usize) {
+        loop {
+            let hash = self.compute_hash();
+            if hash.starts_with(&"0".repeat(difficulty)) {
+                self.hash = hash;
+                break;
+            }
+            self.nonce = self.nonce.wrapping_add(1);
+        }
+    }
 }
 
 fn main() {}
