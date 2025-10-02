@@ -118,7 +118,7 @@ impl Blockchain {
 }
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let path = "./husaynex-chain.txt";
+    let path = "./chain.json";
     let mut blockchain = match load_chain(path) {
         Ok(chain) => chain,
         Err(e) => {

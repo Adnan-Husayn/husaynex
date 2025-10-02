@@ -1,0 +1,21 @@
+{
+  "chain": [
+    {
+      "index": 0,
+      "timestamp": "2025-10-02T09:04:36.194557Z",
+      "data": "Genesis",
+      "nonce": 1550,
+      "prev_hash": "0",
+      "hash": "0070289f637d8890fa403809bc34bc2f888b9edb5c7ffcf4bc636dc04eb481e6"
+    },
+    {
+      "index": 1,
+      "timestamp": "2025-10-02T09:04:36.209777Z",
+      "data": "adnan",
+      "nonce": 48,
+      "prev_hash": "0070289f637d8890fa403809bc34bc2f888b9edb5c7ffcf4bc636dc04eb481e6",
+      "hash": "001e2fd02d47a658df0cc95d22ebdffb4057135f1c7f13ac6fecf63f5a3a30ed"
+    }
+  ],
+  "difficulty": 2
+}
