@@ -1,6 +1,6 @@
 use std::{collections::HashSet, sync::{Arc, Mutex}, net::SocketAddr};
 
-use crate::storage::{load_chain, save_chain};
+use crate::{p2p::start_p2p_server, storage::{load_chain, save_chain}};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -113,9 +113,9 @@ impl Blockchain {
 
     pub fn is_valid_static(chain_to_validate: &[Block], difficulty: usize) -> bool {
         if chain_to_validate.is_empty() {
-            return false; // An empty chain is not valid (or at least, doesn't have a genesis)
+            return false; 
         }
-        // Validate genesis block separately
+        
         let genesis = &chain_to_validate[0];
         if genesis.index != 0 || genesis.prev_hash != "0" {
             eprintln!("Validation failed: Invalid genesis block.");
@@ -172,11 +172,17 @@ async fn main() -> anyhow::Result<()> {
     let peer_state = p2p::PeerState {
         blockchain: Arc::clone(&blockchain),
         known_peers: Arc::clone(&known_peers)
-    }
+    };
 
-    println!("P2P server will listen on: {}", cli.p2p_listen_addr);
+    let p2p_server_handle = tokio::spawn(start_p2p_server(
+        cli.p2p_listen_addr.clone(),
+        peer_state.clone()
+    ));
+
+    println!("[Main] P2P server will listen on: {}", cli.p2p_listen_addr);
+
     if let Some(peers) = &cli.p2p_connect_to {
-        println!("Will attempt to connect to: {:?}", peers);
+        println!("[Main] Will attempt to connect to: {:?}", peers);
     }
 
     match cli.command {
