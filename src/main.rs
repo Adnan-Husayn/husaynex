@@ -1,9 +1,10 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use clap::{Parser, Subcommand};
 use crate::storage::{load_chain, save_chain};
+use chrono::{DateTime, Utc};
+use clap::{Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 
 mod storage;
+mod p2p;
 
 #[derive(Parser)]
 #[command(author, version)]
@@ -122,7 +123,10 @@ fn main() -> anyhow::Result<()> {
     let mut blockchain = match load_chain(path) {
         Ok(chain) => chain,
         Err(e) => {
-            eprintln!("Error loading blockchain from {}: {}. Creating a new one.", path, e);
+            eprintln!(
+                "Error loading blockchain from {}: {}. Creating a new one.",
+                path, e
+            );
             Blockchain::new(2)
         }
     };
