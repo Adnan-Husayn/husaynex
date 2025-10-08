@@ -1,3 +1,5 @@
+use std::{collections::HashSet, sync::{Arc, Mutex}, net::SocketAddr};
+
 use crate::storage::{load_chain, save_chain};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
@@ -11,6 +13,10 @@ mod p2p;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+    #[arg(long, default_value = "127.0.0.1:8000")]
+    p2p_listen_addr:String,
+    #[arg(long, value_delimiter = ',')]
+    p2p_connect_to: Option<Vec<String>>
 }
 
 #[derive(Subcommand)]
@@ -102,25 +108,53 @@ impl Blockchain {
     }
 
     pub fn is_valid(&self) -> bool {
-        for (i, block) in self.chain.iter().enumerate().skip(1) {
-            let prev = &self.chain[i - 1];
+        Self::is_valid_static(&self.chain, self.difficulty)
+    }
+
+    pub fn is_valid_static(chain_to_validate: &[Block], difficulty: usize) -> bool {
+        if chain_to_validate.is_empty() {
+            return false; // An empty chain is not valid (or at least, doesn't have a genesis)
+        }
+        // Validate genesis block separately
+        let genesis = &chain_to_validate[0];
+        if genesis.index != 0 || genesis.prev_hash != "0" {
+            eprintln!("Validation failed: Invalid genesis block.");
+            return false;
+        }
+        if !genesis.hash.starts_with(&"0".repeat(difficulty)) || genesis.compute_hash() != genesis.hash {
+            eprintln!("Validation failed: Genesis block proof-of-work or hash invalid.");
+            return false;
+        }
+
+
+        for (i, block) in chain_to_validate.iter().enumerate().skip(1) {
+            let prev = &chain_to_validate[i - 1];
             if block.prev_hash != prev.hash {
+                eprintln!("Validation failed: prev_hash mismatch for block {}", block.index);
+                return false;
+            }
+            if block.index != prev.index + 1 {
+                eprintln!("Validation failed: index mismatch for block {}", block.index);
                 return false;
             }
             if block.compute_hash() != block.hash {
+                eprintln!("Validation failed: hash invalid for block {}", block.index);
                 return false;
             }
-            if !block.hash.starts_with(&"0".repeat(self.difficulty)) {
+            if !block.hash.starts_with(&"0".repeat(difficulty)) {
+                eprintln!("Validation failed: proof-of-work invalid for block {}", block.index);
                 return false;
             }
         }
         true
     }
 }
-fn main() -> anyhow::Result<()> {
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let path = "./chain.json";
-    let mut blockchain = match load_chain(path) {
+    let mut blockchain_data = match load_chain(path) {
         Ok(chain) => chain,
         Err(e) => {
             eprintln!(
@@ -131,26 +165,45 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
+    let blockchain = Arc::new(Mutex::new(blockchain_data));
+
+    let known_peers = Arc::new(Mutex::new(HashSet::<SocketAddr>::new()));
+
+    let peer_state = p2p::PeerState {
+        blockchain: Arc::clone(&blockchain),
+        known_peers: Arc::clone(&known_peers)
+    }
+
+    println!("P2P server will listen on: {}", cli.p2p_listen_addr);
+    if let Some(peers) = &cli.p2p_connect_to {
+        println!("Will attempt to connect to: {:?}", peers);
+    }
+
     match cli.command {
         Commands::Mine { data } => {
-            let last = blockchain.chain.last().unwrap();
-            let mut block = Block::new(last.index + 1, data, last.hash.clone());
-            block.mine(2);
-            match blockchain.add_block(block) {
-                Ok(()) => println!("Block mined and added to the blockchain!"),
-                Err(e) => println!("Failed to add block: {}", e),
+            let mut bc = blockchain.lock().unwrap();
+            let last = bc.chain.last().unwrap();
+            let mut block = Block::new(last.index+1, data, last.hash.clone());
+            block.mine(bc.difficulty);
+            match bc.add_block(block.clone()) {
+                Ok(()) => {
+                    println!("Block mined and added to the blockchain!");
+                }
+                Err(e) => println!("Failed to add block: {}", e)
             }
-            save_chain(path, &blockchain)?;
-        }
+            save_chain(path, &bc)?;
+        },
         Commands::Show => {
-            for block in &blockchain.chain {
+            let bc = blockchain.lock().unwrap();
+            for block in &bc.chain {
                 println!("{:#?}", block);
             }
-        }
+        },
         Commands::Validate => {
-            if blockchain.is_valid() {
+            let bc = blockchain.lock().unwrap();
+            if bc.is_valid() {
                 println!("Blockchain is valid!")
-            } else if !blockchain.is_valid() {
+            } else {
                 println!("Blockchain is invalid")
             }
         }
