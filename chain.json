@@ -1,0 +1,85 @@
+{
+  "chain": [
+    {
+      "index": 0,
+      "timestamp": "2025-10-17T18:29:10.108284Z",
+      "data": "Genesis",
+      "nonce": 87,
+      "prev_hash": "0",
+      "hash": "00f3df4f5d532157b5adf54143ea41818c5883e0fd4a29c5a257811cd94043b1"
+    },
+    {
+      "index": 1,
+      "timestamp": "2025-10-17T18:29:10.108729Z",
+      "data": "First block from node 2",
+      "nonce": 588,
+      "prev_hash": "00f3df4f5d532157b5adf54143ea41818c5883e0fd4a29c5a257811cd94043b1",
+      "hash": "00c63a74a140ff52378c53f65840e2ba9a67e47e3adb37bf3673186b6d7fec85"
+    },
+    {
+      "index": 2,
+      "timestamp": "2025-10-17T18:29:33.108828Z",
+      "data": "First block from node 3",
+      "nonce": 49,
+      "prev_hash": "00c63a74a140ff52378c53f65840e2ba9a67e47e3adb37bf3673186b6d7fec85",
+      "hash": "00ff4308a81a9ac180592d884b00f1213c374d7bb9cfd7164e1e67c4590eaad1"
+    },
+    {
+      "index": 3,
+      "timestamp": "2025-10-17T18:30:53.914029Z",
+      "data": "First block from node 2",
+      "nonce": 117,
+      "prev_hash": "00ff4308a81a9ac180592d884b00f1213c374d7bb9cfd7164e1e67c4590eaad1",
+      "hash": "002df5a891475111b14d3867bc719947044a30e1b664216815f0a140e37a1454"
+    },
+    {
+      "index": 4,
+      "timestamp": "2025-10-17T18:30:59.698003Z",
+      "data": "First block from node 3",
+      "nonce": 207,
+      "prev_hash": "002df5a891475111b14d3867bc719947044a30e1b664216815f0a140e37a1454",
+      "hash": "00f76f6394b39cbfdc86dbb7c711c9911ff1c9428547090a22b5c1556ee31888"
+    },
+    {
+      "index": 5,
+      "timestamp": "2025-10-17T18:33:13.051793Z",
+      "data": "Node 1's genesis",
+      "nonce": 61,
+      "prev_hash": "00f76f6394b39cbfdc86dbb7c711c9911ff1c9428547090a22b5c1556ee31888",
+      "hash": "00a4c2c50cc658019cfe927d965d3b81574bc0674bdb742ed0392a98ab38b20a"
+    },
+    {
+      "index": 6,
+      "timestamp": "2025-10-17T18:33:21.148845Z",
+      "data": "Node 2's first block",
+      "nonce": 108,
+      "prev_hash": "00a4c2c50cc658019cfe927d965d3b81574bc0674bdb742ed0392a98ab38b20a",
+      "hash": "00800d15b1bcaad96f4350002366be608368ba5004d5affc0bfba83ebd3af0db"
+    },
+    {
+      "index": 7,
+      "timestamp": "2025-10-17T18:33:33.888722Z",
+      "data": "Node 3's first block",
+      "nonce": 38,
+      "prev_hash": "00800d15b1bcaad96f4350002366be608368ba5004d5affc0bfba83ebd3af0db",
+      "hash": "00bad0fb3bf7360f4c0902fd91869830015c0c3693c0c1661e5f8585482199bb"
+    },
+    {
+      "index": 8,
+      "timestamp": "2025-10-17T18:34:52.064641Z",
+      "data": "A-block-1",
+      "nonce": 78,
+      "prev_hash": "00bad0fb3bf7360f4c0902fd91869830015c0c3693c0c1661e5f8585482199bb",
+      "hash": "0053777946904e4190fb706f053f23ec7735a39974ebdf38e4202503b01324e9"
+    },
+    {
+      "index": 9,
+      "timestamp": "2025-10-17T18:35:05.741769Z",
+      "data": "B-block-1",
+      "nonce": 315,
+      "prev_hash": "0053777946904e4190fb706f053f23ec7735a39974ebdf38e4202503b01324e9",
+      "hash": "004b88e37fb3a5733a6903dcbb5e1f216d088513098353d14615115cf846c31d"
+    }
+  ],
+  "difficulty": 2
+}

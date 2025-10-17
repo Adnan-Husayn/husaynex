@@ -265,3 +265,10 @@ pub async fn discover_and_sync_peers(state: PeerState, initial_peers: Vec<String
         tokio::time::sleep(tokio::time::Duration::from_secs(PEER_SYNC_INTERVAL_SECS)).await;
     }
 }
+
+impl PeerState {
+    pub fn is_self_address(&self, addr: &SocketAddr) -> bool {
+        let listen_addr_str = "0.0.0.0:0";
+        addr.to_string() == listen_addr_str
+    }
+}

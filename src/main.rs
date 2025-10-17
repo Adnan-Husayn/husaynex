@@ -1,6 +1,6 @@
 use std::{collections::HashSet, sync::{Arc, Mutex}, net::SocketAddr};
 
-use crate::{p2p::start_p2p_server, storage::{load_chain, save_chain}};
+use crate::{p2p::{discover_and_sync_peers, start_p2p_server}, storage::{load_chain, save_chain}};
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
@@ -181,9 +181,11 @@ async fn main() -> anyhow::Result<()> {
 
     println!("[Main] P2P server will listen on: {}", cli.p2p_listen_addr);
 
-    if let Some(peers) = &cli.p2p_connect_to {
-        println!("[Main] Will attempt to connect to: {:?}", peers);
-    }
+    let p2p_client_handle = tokio::spawn(discover_and_sync_peers(
+        peer_state.clone(),
+        cli.p2p_connect_to.unwrap_or_default(),
+    ));
+    println!("[Main] P2P client/discovery spawned.");
 
     match cli.command {
         Commands::Mine { data } => {
@@ -198,6 +200,8 @@ async fn main() -> anyhow::Result<()> {
                 Err(e) => println!("Failed to add block: {}", e)
             }
             save_chain(path, &bc)?;
+            println!("[Main] Mining complete. Node will now remain active for P2P operations.");
+            p2p_server_handle.await??;
         },
         Commands::Show => {
             let bc = blockchain.lock().unwrap();
