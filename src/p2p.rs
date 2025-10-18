@@ -51,38 +51,31 @@ async fn handle_connection(
     remote_addr: SocketAddr,
 ) -> anyhow::Result<()> {
     let (mut reader, mut writer) = socket.split();
-    let mut buffer = Vec::with_capacity(PEER_BUFFER_SIZE);
-
-    println!("[P2P Handler {}] Connection established.", remote_addr);
+    let node_id_prefix = state.blockchain.lock().unwrap().chain[0].hash.chars().take(8).collect::<String>();
+    println!("[P2P Handler {} {}] Connection established.", node_id_prefix, remote_addr);
+    
 
     loop {
-        buffer.clear();
+        let incoming_message_option = recv_message(&mut reader).await;
 
-        let bytes_read = reader.read_buf(&mut buffer).await?;
-        if bytes_read == 0 {
-            println!("[P2P Handler {}] Peer disconnected.", remote_addr);
-            break;
-        }
-
-        let incoming_message: Message = match serde_json::from_slice(&buffer[..bytes_read]) {
-            Ok(msg) => msg,
+        let incoming_message = match incoming_message_option {
+            Ok(Some(msg)) => msg,
+            Ok(None) => {
+                println!("[P2P Handler {} {}] Peer disconnected gracefully.", node_id_prefix, remote_addr);
+                break;
+            }
             Err(e) => {
                 eprintln!(
-                    "[P2P Handler {}] Failed to deserialize message: {}. Raw bytes: {:?}",
-                    remote_addr,
-                    e,
-                    &buffer[..bytes_read]
+                    "[P2P Handler {} {}] Failed to receive message: {}. Closing connection.",
+                    node_id_prefix, remote_addr, e
                 );
-
-                let error_response = Message::Error(format!("Invalid message format: {}", e));
-                let serialized_error = serde_json::to_vec(&error_response)?;
-                writer.write_all(&serialized_error).await?;
-                writer.flush().await?;
-                continue;
+                let error_response = Message::Error(format!("Invalid message format or network error: {}", e));
+                send_message(&mut writer, &error_response).await?;
+                break;
             }
         };
 
-        println!("[P2P Handler {}] Received: {:?}", remote_addr, incoming_message);
+        println!("[P2P Handler {} {}] Received: {:?}", node_id_prefix, remote_addr, incoming_message);
 
         let response_message = match incoming_message {
             Message::GetChain => {
@@ -138,10 +131,8 @@ async fn handle_connection(
             }
         };
 
-        let serialized_response = serde_json::to_vec(&response_message)?;
-        writer.write_all(&serialized_response).await?;
-        writer.flush().await?;
-        println!("[P2P Handler {}] Sent: {:?}", remote_addr, response_message);
+        send_message(&mut writer, &response_message).await?;
+        println!("[P2P Handler {} {}] Sent: {:?}", node_id_prefix, remote_addr, response_message);
     }
 
     Ok(())
@@ -153,49 +144,43 @@ pub async fn connect_to_peer(
     peer_addr: SocketAddr,
     state: PeerState
 ) -> anyhow::Result<()> {
-    println!("[P2P Client {}] Attempting to connect to peer: {}", state.blockchain.lock().unwrap().chain[0].hash, peer_addr);
+    let node_id_prefix = state.blockchain.lock().unwrap().chain[0].hash.chars().take(8).collect::<String>();
+    println!("[P2P Client {}] Attempting to connect to peer: {}", node_id_prefix, peer_addr);
     let mut stream = TcpStream::connect(peer_addr).await?;
-    println!("[P2P Client {}] Connected to peer: {}", state.blockchain.lock().unwrap().chain[0].hash, peer_addr);
+    println!("[P2P Client {}] Connected to peer: {}", node_id_prefix, peer_addr);
 
     let (mut reader, mut writer) = stream.split();
 
     let request_chain = Message::GetChain;
-    let serialized_request = serde_json::to_vec(&request_chain)?;
-    writer.write_all(&serialized_request).await?;
-    writer.flush().await?;
-    println!("[P2P Client {}] Sent GET_CHAIN to {}", state.blockchain.lock().unwrap().chain[0].hash, peer_addr);
-
-    let mut buffer = Vec::with_capacity(PEER_BUFFER_SIZE);
+    send_message(&mut writer, &request_chain).await?;
+    println!("[P2P Client {}] Sent GET_CHAIN to {}", node_id_prefix, peer_addr);
 
     loop {
-        let bytes_read = reader.read_buf(&mut buffer).await?;
-        if bytes_read == 0 {
-            println!("[P2P Client {}] Peer {} disconnected during chain exchange.", state.blockchain.lock().unwrap().chain[0].hash, peer_addr);
-            break;
-        }
+        let message_option = recv_message(&mut reader).await;
 
-        let message : Message = match serde_json::from_slice(&buffer[..bytes_read]) {
-            Ok(msg) => msg,
+        let message = match message_option {
+            Ok(Some(msg)) => msg,
+            Ok(None) => {
+                println!("[P2P Client {}] Peer {} disconnected during chain exchange.", node_id_prefix, peer_addr);
+                break;
+            }
             Err(e) => {
-                 eprintln!(
-                    "[P2P Client {}] Error deserializing response from {}: {}",
-                    state.blockchain.lock().unwrap().chain[0].hash,
-                    peer_addr,
-                    e
+                eprintln!(
+                    "[P2P Client {}] Error receiving response from {}: {}. Closing connection.",
+                    node_id_prefix, peer_addr, e
                 );
-                buffer.clear(); 
-                continue;
+                break;
             }
         };
         
-        println!("[P2P Client {}] Received from {}: {:?}", state.blockchain.lock().unwrap().chain[0].hash, peer_addr, message);
+        println!("[P2P Client {}] Received from {}: {:?}", node_id_prefix, peer_addr, message);
 
         if let Message::SendChain(received_chain) = message {
             let mut blockchain = state.blockchain.lock().unwrap();
             if received_chain.len() > blockchain.chain.len() && Blockchain::is_valid_static(&received_chain, blockchain.difficulty) {
                 println!(
                     "[P2P Client {}] Adopted a longer valid chain from {} (length {} vs {}).",
-                    state.blockchain.lock().unwrap().chain[0].hash,
+                    node_id_prefix,
                     peer_addr,
                     received_chain.len(),
                     blockchain.chain.len()
@@ -204,16 +189,16 @@ pub async fn connect_to_peer(
             } else {
                 println!(
                     "[P2P Client {}] Received chain from {} is not longer or not valid. Not adopting.",
-                    state.blockchain.lock().unwrap().chain[0].hash,
+                    node_id_prefix,
                     peer_addr
                 );
             }
             break;
         } else if let Message::Error(e) = message {
-            eprintln!("[P2P Client {}] Peer {} reported error: {}", state.blockchain.lock().unwrap().chain[0].hash, peer_addr, e);
+            eprintln!("[P2P Client {}] Peer {} reported error: {}", node_id_prefix, peer_addr, e);
             break;
         } else {
-            println!("[P2P Client {}] Received unexpected message from {}: {:?}", state.blockchain.lock().unwrap().chain[0].hash, peer_addr, message);
+            println!("[P2P Client {}] Received unexpected message from {}: {:?}", node_id_prefix, peer_addr, message);
             break;
         }
     }
@@ -234,8 +219,10 @@ pub async fn discover_and_sync_peers(state: PeerState, initial_peers: Vec<String
         }
     }
 
+    let node_id_prefix = state.blockchain.lock().unwrap().chain[0].hash.chars().take(8).collect::<String>();
+
     loop {
-        println!("[P2P Discovery {}] Starting peer sync cycle...", state.blockchain.lock().unwrap().chain[0].hash);
+        println!("[P2P Discovery {}] Starting peer sync cycle...", node_id_prefix);
         let peer_to_connect: Vec<SocketAddr> = {
             state.known_peers.lock().unwrap().iter().cloned().collect()
         };
@@ -243,7 +230,7 @@ pub async fn discover_and_sync_peers(state: PeerState, initial_peers: Vec<String
         let mut tasks = FuturesUnordered::new();
 
         if peer_to_connect.is_empty() {
-            println!("[P2P Discovery {}] No known peers to connect to.", state.blockchain.lock().unwrap().chain[0].hash);
+            println!("[P2P Discovery {}] No known peers to connect to.", node_id_prefix);
         }
 
         for peer_addr in peer_to_connect {
@@ -251,14 +238,14 @@ pub async fn discover_and_sync_peers(state: PeerState, initial_peers: Vec<String
 
             tasks.push(tokio::spawn(async move {
                 if let Err(e) = connect_to_peer(peer_addr, state_clone.clone()).await {
-                    eprintln!("[P2P Discovery {}] Error connecting to peer {}: {:?}", state_clone.blockchain.lock().unwrap().chain[0].hash, peer_addr, e);
+                    eprintln!("[P2P Discovery {}] Error connecting to peer {}: {:?}", state_clone.blockchain.lock().unwrap().chain[0].hash.chars().take(8).collect::<String>(), peer_addr, e);
                 }
             }));
         }
 
         while let Some(result) = tasks.next().await {
             if let Err(e) = result {
-                eprintln!("[P2P Discovery {}] Peer connection task failed: {:?}", state.blockchain.lock().unwrap().chain[0].hash, e);
+                eprintln!("[P2P Discovery {}] Peer connection task failed: {:?}", node_id_prefix, e);
             }
         }
 
@@ -271,4 +258,34 @@ impl PeerState {
         let listen_addr_str = "0.0.0.0:0";
         addr.to_string() == listen_addr_str
     }
+}
+
+async fn send_message(writer: &mut (impl AsyncWriteExt + Unpin), message : &Message) -> anyhow::Result<()> {
+    let serialized_payload = serde_json::to_vec(message)?;
+    let len = serialized_payload.len() as u32;
+
+    writer.write_all(&len.to_le_bytes()).await?;
+    writer.write_all(&serialized_payload).await?;
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn recv_message(reader: &mut (impl AsyncReadExt + Unpin)) -> anyhow::Result<Option<Message>> {
+    let mut len_bytes = [0u8; 4];
+
+    if reader.read_exact(&mut len_bytes).await.is_err() {
+        return Ok(None);
+    }
+
+    let len = u32::from_le_bytes(len_bytes) as usize;
+
+    if len == 0 {
+        return Ok(None);
+    }
+
+    let mut payload_buffer = vec![0u8; len];
+    reader.read_exact(&mut payload_buffer).await?;
+    
+    let message: Message = serde_json::from_slice(&payload_buffer)?;
+    Ok(Some(message))
 }
