@@ -4,6 +4,7 @@ use crate::{p2p::{discover_and_sync_peers, start_p2p_server}, storage::{load_cha
 use chrono::{DateTime, Utc};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast;
 
 mod storage;
 mod p2p;
@@ -169,16 +170,18 @@ async fn main() -> anyhow::Result<()> {
 
     let known_peers = Arc::new(Mutex::new(HashSet::<SocketAddr>::new()));
 
+    let (new_block_sender, _new_blockchain_receiver) = broadcast::channel(16);
+
     let peer_state = p2p::PeerState {
         blockchain: Arc::clone(&blockchain),
-        known_peers: Arc::clone(&known_peers)
+        known_peers: Arc::clone(&known_peers),
+        new_block_sender: new_block_sender.clone(),
     };
 
     let p2p_server_handle = tokio::spawn(start_p2p_server(
         cli.p2p_listen_addr.clone(),
         peer_state.clone()
     ));
-
     println!("[Main] P2P server will listen on: {}", cli.p2p_listen_addr);
 
     let p2p_client_handle = tokio::spawn(discover_and_sync_peers(
@@ -196,6 +199,11 @@ async fn main() -> anyhow::Result<()> {
             match bc.add_block(block.clone()) {
                 Ok(()) => {
                     println!("Block mined and added to the blockchain!");
+                    if let Err(e) = new_block_sender.send(block) { 
+                        eprintln!("[Main] Failed to broadcast new block: {:?}", e);
+                    } else {
+                        println!("[Main] Successfully broadcast new block to peers.");
+                    }
                 }
                 Err(e) => println!("Failed to add block: {}", e)
             }

@@ -79,6 +79,22 @@
       "nonce": 315,
       "prev_hash": "0053777946904e4190fb706f053f23ec7735a39974ebdf38e4202503b01324e9",
       "hash": "004b88e37fb3a5733a6903dcbb5e1f216d088513098353d14615115cf846c31d"
+    },
+    {
+      "index": 10,
+      "timestamp": "2025-10-20T17:43:47.211339Z",
+      "data": "Node 3's first block",
+      "nonce": 138,
+      "prev_hash": "004b88e37fb3a5733a6903dcbb5e1f216d088513098353d14615115cf846c31d",
+      "hash": "00328b87ec45a4722c51224989cb04ed5ede208d89e6c0da8050c738fb5fe18a"
+    },
+    {
+      "index": 11,
+      "timestamp": "2025-10-20T17:44:08.813930Z",
+      "data": "First block from node 2",
+      "nonce": 323,
+      "prev_hash": "00328b87ec45a4722c51224989cb04ed5ede208d89e6c0da8050c738fb5fe18a",
+      "hash": "006a45ba0b1a7c172775e90049801ee3319904715585c892103281a8ef091a0a"
     }
   ],
   "difficulty": 2
