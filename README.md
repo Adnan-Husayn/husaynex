@@ -56,7 +56,7 @@ Built for learning and experimentation by Adnan Husayn.
 
 1. Clone
 ```
-git clone https://github.com/<your-username>/husaynex.git
+git clone https://github.com/Adnan-Husayn/husaynex.git
 cd husaynex
 ```
 
